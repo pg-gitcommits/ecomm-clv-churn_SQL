@@ -1,0 +1,40 @@
+/*If analysis is to be done for subscription model of any kind, CLV can be calculated using the following procedure*/
+
+/*Calculating Churn Rate for period of March 2017 to February 2018*/
+/*Subset data for Feb 2018 records:*/
+
+CREATE TABLE data0218 (customer_id int,order_id int, date_confirmed TIMESTAMP, 
+						  date_shipped TIMESTAMP, date_cancelled TIMESTAMP, order_type varchar(100), cm2 float)
+					  
+INSERT INTO data0218
+SELECT customer_id,  order_id, date_confirmed, date_shipped, date_cancelled, order_type, cm2
+FROM OFTY
+WHERE date_confirmed BETWEEN '2018-02-01' AND '2018-03-01'
+
+Select * FROM data0218
+order by date_confirmed ASC
+
+SELECT COUNT(*) FROM data0218
+
+
+/*Customer retained in Feb 2018 of customers acquired in March 2017*/ /*customers lost = 5,971*/
+Select cast(cust_lost as float)/cast(cust_in_0317 as float)*100 From (
+
+SELECT 1 as key, COUNT(DISTINCT data0317.customer_id) as cust_lost FROM data0317
+WHERE data0317.customer_id NOT IN
+/* subquery to retrive records before March 2017*/
+(SELECT DISTINCT data0218.customer_id FROM data0218)
+
+) as cust_lost_tab
+inner join
+/*Total customers at the start of the peroid March 2017 to Feb 2018 i.e., customer is March 2017*/
+(SELECT 1 as key, COUNT(DISTINCT data0317.customer_id) as cust_in_0317 FROM data0317) as tot_0317_tab
+on cust_lost_tab.key = tot_0317_tab.key
+
+/* Indicates Churn is 95.44% */
+
+/*Customers acquired for period of March 2017 to February 2018*/ /* i.e., Cn_2017-2018 */
+SELECT COUNT(DISTINCT data0218.customer_id) FROM data0218
+WHERE data0218.customer_id NOT IN
+/* subquery to retrive records before March 2017*/
+(SELECT DISTINCT data0317.customer_id FROM data0317)

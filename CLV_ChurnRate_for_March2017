@@ -1,0 +1,91 @@
+/*Import .csv as Table:*/
+
+CREATE TABLE OFTY(customer_id int,order_id int, date_confirmed TIMESTAMP, 
+						  date_shipped TIMESTAMP, date_cancelled TIMESTAMP, order_type varchar(100), cm2 float)
+
+COPY OFTY FROM 'data.csv' DELIMITER ';' CSV HEADER;
+
+SELECT * FROM OFTY
+
+Select COUNT(*) FROM OFTY
+
+/*Subset data for March 2017 records:*/
+
+CREATE TABLE data0317 (customer_id int,order_id int, date_confirmed TIMESTAMP, 
+						  date_shipped TIMESTAMP, date_cancelled TIMESTAMP, order_type varchar(100), cm2 float)
+					  
+INSERT INTO data0317
+SELECT customer_id,  order_id, date_confirmed, date_shipped, date_cancelled, order_type, cm2
+FROM OFTY
+WHERE date_confirmed BETWEEN '2017-03-01' AND '2017-04-01'
+
+Select * FROM data0317
+order by date_confirmed DESC
+
+Select COUNT(*) FROM data0317
+
+/*Identifying Customers Acquired in March 2017:*/
+
+SELECT DISTINCT data0317.customer_id FROM data0317
+WHERE data0317.customer_id NOT IN
+/* subquery to retrive records before March 2017*/
+(SELECT DISTINCT OFTY.customer_id FROM OFTY
+WHERE date_confirmed < '2017-03-01')
+/*GROUP BY data0317.customer_id*/
+
+
+/*Creating table with only customers acquired in March 2017*/
+
+CREATE TABLE ofty_f (customer_id int,order_id int, date_confirmed TIMESTAMP, 
+						  date_shipped TIMESTAMP, date_cancelled TIMESTAMP, order_type varchar(100), cm2 float)
+
+INSERT INTO ofty_f
+SELECT ofty.customer_id, ofty.order_id, ofty.date_confirmed, ofty.date_shipped, ofty.date_cancelled, ofty.order_type, SUM(ofty.cm2) FROM OFTY
+WHERE customer_id IN
+(SELECT DISTINCT data0317.customer_id FROM data0317
+WHERE data0317.customer_id NOT IN
+(SELECT DISTINCT OFTY.customer_id FROM OFTY
+WHERE date_confirmed < '2017-03-01')
+/*GROUP BY data0317.customer_id)*/
+GROUP BY ofty.customer_id, ofty.order_id, ofty.date_confirmed, ofty.date_shipped, ofty.date_cancelled, ofty.order_type
+
+SELECT * FROM ofty_f
+ORDER BY ofty_f.date_confirmed ASC
+
+SELECT COUNT(*) FROM ofty_f
+ 
+/*customers acquired in March 2017*/ /*5,597*/
+SELECT COUNT(DISTINCT ofty_f.customer_id) from ofty_f
+
+ 
+/*---- Average Customer Lifetime Value ----*/
+
+/* Since Oufittery GmbH follows a non-subscription based business model, an attempt was made calculate customer churn rate as follows*/
+ 
+/*Calculating Churn Rate as count of orders cancelled by count of orders confirmed*/
+SELECT CAST(COUNT(date_cancelled) AS FLOAT)/CAST(COUNT(date_confirmed) AS FLOAT) as Churn_Rate FROM ofty_f
+/* Churn Rate = 0.2601 */
+
+/* Since Retention Rate = 1 - Churn Rate*/
+SELECT (1-CAST(COUNT(date_cancelled) AS FLOAT)/CAST(COUNT(date_confirmed) AS FLOAT)) as Retention_Rate FROM ofty_f 
+/* Retention Rate = 0.7398 */
+
+/*Calculating Average of Contribution Margins*/
+SELECT AVG(ofty_f.cm2) from ofty_f
+WHERE ofty_f.cm2 IS NOT NULL
+/* Average Contribution Margin = 59.80 */
+
+ 
+/* Calculating Average Customer Lifetime Value as ratio of Average Contribution Margin and Retention Rate */
+SELECT avg_cm2_tab.avg_2/churn_rate_tab.avg_1 From (
+SELECT 1 AS KEY, CAST(COUNT(date_cancelled) AS FLOAT)/CAST(COUNT(date_confirmed) AS FLOAT) AS avg_1 FROM ofty_f
+) AS churn_rate_tab
+inner join
+(SELECT 1 AS KEY, AVG(ofty_f.cm2) AS avg_2 FROM ofty_f
+WHERE ofty_f.cm2 IS NOT NULL) AS avg_cm2_tab
+ON churn_rate_tab.key = avg_cm2_tab.key
+ 
+/*Average Customer Lifetime Value = 80.84*/
+ 
+ 
+ 
